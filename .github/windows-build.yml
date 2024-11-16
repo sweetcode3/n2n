@@ -1,0 +1,45 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
+      
+    - name: Install OpenSSL
+      run: |
+        $openssl_url = "https://slproweb.com/download/Win32OpenSSL-1_1_1w.exe"
+        Invoke-WebRequest -Uri $openssl_url -OutFile openssl_installer.exe
+        Start-Process -FilePath "openssl_installer.exe" -ArgumentList "/silent /verysilent /sp- /suppressmsgboxes" -Wait
+      
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DOPENSSL_USE_STATIC_LIBS=true
+        
+    - name: Build
+      working-directory: ./build
+      run: |
+        MSBuild.exe edge.vcxproj /p:Configuration=Release
+        MSBuild.exe supernode.vcxproj /p:Configuration=Release
+        MSBuild.exe n2n-benchmark.vcxproj /p:Configuration=Release
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: n2n-windows-binaries
+        path: |
+          build/Release/*.exe
+          build/Release/*.dll
+        
